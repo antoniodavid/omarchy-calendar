@@ -41,20 +41,20 @@ Omarchy 4 with Quickshell. Google Calendar is optional, see
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/tmn73/omarchy-calendar.git --enable
+omarchy plugin add https://github.com/antoniodavid/omarchy-calendar.git --enable
 ```
 
 This widget **replaces** the built-in clock. In `~/.config/omarchy/shell.json`,
 remove the `omarchy.clock` entry from `bar.layout.center` and point
-`bar.centerAnchor` at `tmn73.calendar`:
+`bar.centerAnchor` at `antoniodavid.calendar`:
 
 ```json
 {
   "bar": {
-    "centerAnchor": "tmn73.calendar",
+    "centerAnchor": "antoniodavid.calendar",
     "layout": {
       "center": [
-        { "id": "tmn73.calendar", "format": "dddd HH:mm" }
+        { "id": "antoniodavid.calendar", "format": "dddd HH:mm" }
       ]
     }
   }
@@ -72,10 +72,52 @@ an empty calendar, because nothing is feeding it yet. Connect Google Calendar
 below, or point any other source at the file. The widget says as much when you
 open it, with the command to run.
 
-## Sync your Google Calendar
+## Sync your calendars
+
+This fork ships **two backends** for feeding the widget. The default is
+`vdirsyncer` — no Google Cloud project, no OAuth consent screen, no `gcloud`.
+It reads the local CalDAV/Google mirror that `vdirsyncer` already maintains,
+expands recurring series, and writes the same contract file the widget reads.
+
+### vdirsyncer (default, no Google account needed)
+
+If you already use `vdirsyncer` (or khal, or any tool that mirrors calendars
+into `.ics` files under `~/.local/share/calendars/`), you are done after
+installing the timer:
 
 ```bash
-~/.config/omarchy/plugins/tmn73.calendar/sync/setup
+# Install the 5-minute sync timer (user-level).
+systemctl --user enable --now ~/.config/omarchy/antoniodavid.calendar/sync/systemd/omarchy-calendar-sync.timer
+```
+
+The sync runs `vdirsyncer sync` first, then converts every `.ics` in
+`~/.local/share/calendars/` into the contract file. If the network sync fails,
+it keeps using the last good mirror instead of emptying the widget.
+
+Configuration lives in `~/.config/omarchy/calendar-sync.json`:
+
+```json
+{
+  "source": "vdirsyncer",
+  "vdirsyncer": {
+    "syncBin": "vdirsyncer",
+    "root": "~/.local/share/calendars",
+    "sync": true
+  },
+  "window": { "pastDays": 7, "futureDays": 60 }
+}
+```
+
+Run a one-off sync from a terminal to test it:
+
+```bash
+~/.config/omarchy/plugins/antoniodavid.calendar/sync/omarchy-calendar-sync --source vdirsyncer
+```
+
+### Google Calendar via gws (original backend)
+
+```bash
+~/.config/omarchy/plugins/antoniodavid.calendar/sync/setup
 ```
 
 Run it in a real terminal. It pauses for input, and four steps have to be done

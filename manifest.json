@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "tmn73.calendar",
+  "id": "antoniodavid.calendar",
   "name": "Calendar",
-  "version": "0.2.1",
-  "author": "tmn73",
+  "version": "0.3.0",
+  "author": "antoniodavid",
   "license": "MIT",
-  "description": "Your Google Calendar in the bar. Your next meeting at a glance, and one click to join it.",
+  "description": "Your calendar in the bar, synced from vdirsyncer (no Google account needed).",
   "kinds": [
     "bar-widget"
   ],
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Calendar",
-    "description": "Your Google Calendar in the bar. Your next meeting at a glance, and one click to join it.",
+    "description": "Your calendar in the bar. Your next meeting at a glance, and one click to join it. Syncs via vdirsyncer or the Google Workspace CLI.",
     "category": "Time",
     "allowMultiple": false,
     "defaults": {

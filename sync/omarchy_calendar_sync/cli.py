@@ -10,8 +10,9 @@ from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import config as config_module
-from . import contract, normalize
+from . import contract, normalize, vdir
 from .gws import Gws, GwsError
+from .vdir import VdirError
 
 EXIT_OK = 0
 EXIT_SYNC_FAILED = 1
@@ -169,10 +170,16 @@ def run(client, cfg, now, out_path, local_tz):
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="omarchy-calendar-sync",
-        description="Sync Google Calendar into the Omarchy calendar widget file.",
+        description="Sync calendars into the Omarchy calendar widget file.",
     )
     parser.add_argument("--config", default=None, help="path to calendar-sync.json")
     parser.add_argument("--out", default=None, help="path to the contract file")
+    parser.add_argument(
+        "--source",
+        choices=["gws", "vdirsyncer"],
+        default="vdirsyncer",
+        help="calendar backend (default: vdirsyncer, no Google account needed)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -185,7 +192,42 @@ def main(argv=None):
     now = datetime.now(timezone.utc)
     local_tz = resolve_local_timezone()
 
-    return run(Gws(cfg["profile"], binary=cfg["gwsPath"]), cfg, now, out_path, local_tz)
+    source = args.source or cfg.get("source", "vdirsyncer")
+    if source == "gws":
+        return run(Gws(cfg["profile"], binary=cfg["gwsPath"]), cfg, now, out_path, local_tz)
+    return run_vdirsyncer(cfg, now, out_path, local_tz)
+
+
+def run_vdirsyncer(cfg, now, out_path, local_tz):
+    """Fetch from the local vdirsyncer mirror, normalize, write."""
+    root = Path(cfg.get("vdirsyncer", {}).get("root", vdir.DEFAULT_ROOT)).expanduser()
+    sync_bin = cfg.get("vdirsyncer", {}).get("syncBin", vdir.DEFAULT_SYNC_BIN)
+
+    try:
+        if cfg.get("vdirsyncer", {}).get("sync", True):
+            vdir.run_sync(sync_bin, root)
+
+        time_min, time_max = config_module.window_bounds(cfg, now)
+        window_start = datetime.fromisoformat(time_min)
+        window_end = datetime.fromisoformat(time_max)
+
+        rows = vdir.build_rows(root, local_tz, window_start, window_end)
+    except VdirError as error:
+        print(f"sync failed: {error}", file=sys.stderr)
+        return EXIT_SYNC_FAILED
+
+    rows.sort(key=lambda row: (row["dateKey"], row["start"], row["title"]))
+    doc = contract.build_document(rows, now.isoformat(), "vdirsyncer")
+
+    problems = contract.validate(doc)
+    if problems:
+        for problem in problems:
+            print(f"refusing to write invalid document: {problem}", file=sys.stderr)
+        return EXIT_SYNC_FAILED
+
+    write_atomic(out_path, doc)
+    print(f"wrote {len(rows)} rows from vdirsyncer to {out_path}")
+    return EXIT_OK
 
 
 if __name__ == "__main__":
