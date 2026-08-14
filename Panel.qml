@@ -17,8 +17,8 @@ import "Model.js" as Model
 // anchor against.
 Panel {
   id: root
-  moduleName: "tmn73.calendar"
-  ipcTarget: "tmn73.calendar"
+  moduleName: "antoniodavid.calendar"
+  ipcTarget: "antoniodavid.calendar"
   manageIpc: false
 
   property var anchorItem: null
@@ -1058,6 +1058,11 @@ Panel {
                 // Only around the actual time. A Join button on next week's
                 // meeting is noise that dilutes the one that matters.
                 readonly property bool joinable: Model.isJoinableNow(modelData, root.nowTick.getTime(), root.todayKey)
+                // A Meet link stays reachable outside the join window: the
+                // same button reads "Join" around the event and "Meet" the
+                // rest of the time, so the link is never more than a click
+                // away while browsing the calendar.
+                readonly property bool hasMeeting: meetingUrl !== ""
                 readonly property string eventUrl: Model.eventUrlFor(modelData)
                 readonly property bool openable: eventUrl !== ""
 
@@ -1072,13 +1077,13 @@ Panel {
                 // Only rows that can actually do something respond to a click.
                 HoverHandler {
                   id: eventHover
-                  enabled: eventRow.openable || eventRow.joinable
+                  enabled: eventRow.openable || eventRow.hasMeeting
                   cursorShape: Qt.PointingHandCursor
                 }
 
                 Rectangle {
                   id: joinButton
-                  visible: eventRow.joinable
+                  visible: eventRow.hasMeeting
                   anchors.right: parent.right
                   anchors.verticalCenter: parent.verticalCenter
                   width: joinLabel.implicitWidth + Style.space(8)
@@ -1107,7 +1112,9 @@ Panel {
                   Text {
                     id: joinLabel
                     anchors.centerIn: parent
-                    text: qsTr("Join")
+                    // "Join" while the meeting is live; "Meet" before and
+                    // after, so a future event never hides its link.
+                    text: eventRow.joinable ? qsTr("Join") : qsTr("Meet")
                     color: joinHover.hovered ? Color.background : Qt.darker(root.contentForeground, 1.4)
                     font.family: root.contentFontFamily
                     font.pixelSize: Style.font.caption
@@ -1117,8 +1124,8 @@ Panel {
                 Row {
                   id: eventBody
                   anchors.left: parent.left
-                  anchors.right: eventRow.joinable ? joinButton.left : parent.right
-                  anchors.rightMargin: eventRow.joinable ? Style.space(3) : 0
+                  anchors.right: eventRow.hasMeeting ? joinButton.left : parent.right
+                  anchors.rightMargin: eventRow.hasMeeting ? Style.space(3) : 0
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: Style.space(4)
 
