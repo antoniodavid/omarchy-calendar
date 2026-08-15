@@ -407,6 +407,43 @@ Panel {
     onTriggered: root.setupCommandCopied = false
   }
 
+  // Manual refresh: runs the sync right now, then tells the user what
+  // happened. The FileView above watches the events file, so the panel
+  // picks up the rewritten file by itself — no reload needed here.
+  Process {
+    id: syncProcess
+    property bool refreshing: false
+    onExited: function(exitCode) {
+      root.syncing = false
+      if (exitCode === 0) {
+        notifySync("Calendar synced", "Calendars refreshed.")
+      } else {
+        notifySync("Calendar sync failed", "Check the sync command in a terminal.")
+      }
+    }
+  }
+
+  property bool syncing: false
+
+  function refreshCalendars() {
+    if (root.syncing) return
+    root.syncing = true
+    syncProcess.command = [
+      (Quickshell.env("HOME") || "") + "/.config/omarchy/plugins/antoniodavid.calendar/sync/omarchy-calendar-sync",
+      "--source", "vdirsyncer"
+    ]
+    syncProcess.running = true
+  }
+
+  function notifySync(summary, body) {
+    notifyProcess.command = ["notify-send", "-a", "omarchy-calendar", summary, body]
+    notifyProcess.running = true
+  }
+
+  Process {
+    id: notifyProcess
+  }
+
   SystemClock {
     id: clock
     precision: SystemClock.Minutes
@@ -478,6 +515,19 @@ Panel {
             // Sits in the hero's right margin rather than in the row itself,
             // so turning it on and off never shifts the date off centre.
             PanelActionButton {
+              id: refreshButton
+              anchors.right: settingsButton.left
+              anchors.rightMargin: Style.space(2)
+              anchors.verticalCenter: parent.verticalCenter
+              iconText: root.syncing ? "󰓦" : "󰑐"
+              tooltipText: root.syncing ? "Syncing calendars…" : "Sync calendars now"
+              foreground: root.contentForeground
+              fontFamily: root.contentFontFamily
+              onClicked: root.refreshCalendars()
+            }
+
+            PanelActionButton {
+              id: settingsButton
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               iconText: root.settingsOpen ? "󰅖" : "󰒓"
